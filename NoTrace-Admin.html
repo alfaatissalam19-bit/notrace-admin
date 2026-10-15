@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NoTrace Admin</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<script>tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{sans:['Inter','sans-serif']}}}}</script>
+<style>
+body{background:#000;color:#fff;font-family:'Inter',sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:#27272a;border-radius:4px}
+.card{background:#121215;border:1px solid #27272a;border-radius:16px}
+.input{width:100%;background:#1c1c21;border:1px solid #27272a;border-radius:12px;padding:10px 14px;color:#fff;font-size:14px;outline:none;transition:.2s}
+.input:focus{border-color:#52525b}
+.btn{padding:8px 16px;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;border:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:.2s}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:#fff;color:#000}.btn-primary:hover:not(:disabled){background:#e5e5e5}
+.btn-danger{background:rgba(244,63,94,.15);color:#fb7185;border:1px solid rgba(244,63,94,.3)}.btn-danger:hover:not(:disabled){background:rgba(244,63,94,.25)}
+.btn-secondary{background:#1c1c21;color:#d4d4d8;border:1px solid #27272a}.btn-secondary:hover:not(:disabled){background:#27272a}
+.btn-warn{background:rgba(245,158,11,.15);color:#fbbf24;border:1px solid rgba(245,158,11,.3)}.btn-warn:hover:not(:disabled){background:rgba(245,158,11,.25)}
+.btn-sm{padding:6px 12px;font-size:11px}
+.toast{position:fixed;top:24px;left:50%;transform:translate(-50%,-100px);opacity:0;transition:all .3s;z-index:999;padding:12px 20px;border-radius:12px;display:flex;align-items:center;gap:10px;font-size:13px;pointer-events:none;max-width:90vw;font-weight:500}
+.toast.show{transform:translate(-50%,0);opacity:1}
+.toast-info{background:#1c1c21;border:1px solid #3f3f46}
+.toast-success{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:#6ee7b7}
+.toast-error{background:rgba(244,63,94,.15);border:1px solid rgba(244,63,94,.3);color:#fb7185}
+.stat-card{background:#121215;border:1px solid #27272a;border-radius:16px;padding:14px 10px;text-align:center}
+.stat-value{font-size:22px;font-weight:700}
+.stat-label{font-size:10px;color:#71717a;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;font-weight:500}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.status-online{background:#10b981;box-shadow:0 0 8px rgba(16,185,129,.5)}
+.status-error{background:#ef4444}
+.status-loading{background:#f59e0b;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.toggle{width:44px;height:24px;background:#27272a;border-radius:999px;position:relative;cursor:pointer;flex-shrink:0;transition:.2s}
+.toggle.on{background:#10b981}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s}
+.toggle.on::after{left:22px}
+.filter-btn.active{background:#fff !important;color:#000 !important;border-color:#fff !important}
+.node-card{transition:.2s}.node-card:hover{border-color:#3f3f46;transform:translateY(-1px)}
+</style>
+</head>
+<body class="min-h-screen p-4 sm:p-6">
+
+<div id="toast" class="toast toast-info"><i class="fa-solid fa-circle-info"></i><span id="toast-msg">Message</span></div>
+
+<div id="app" class="max-w-5xl mx-auto">
+
+<!-- ============ LOGIN ============ -->
+<div id="screen-login" class="admin-screen">
+  <div class="card max-w-md mx-auto mt-16 p-8 text-center">
+    <div class="w-14 h-14 mx-auto mb-5 rounded-2xl border border-amber-400/30 flex items-center justify-center bg-amber-400/5">
+      <i class="fa-solid fa-shield-halved text-2xl text-amber-400"></i>
+    </div>
+    <h1 class="text-2xl font-bold mb-1">NoTrace Admin</h1>
+    <p class="text-xs text-gray-500 mb-7">Masukkan password admin</p>
+    <input type="password" id="admin-password" class="input mb-3 text-center tracking-widest" placeholder="••••••••" onkeydown="if(event.key==='Enter')tryLogin()">
+    <div id="login-error" class="hidden text-rose-400 text-xs bg-rose-500/10 rounded-lg py-2 mb-3"><i class="fa-solid fa-circle-exclamation mr-1"></i>Password salah</div>
+    <button class="btn btn-primary w-full py-3.5" onclick="tryLogin()"><i class="fa-solid fa-right-to-bracket"></i> LOGIN</button>
+    <p class="text-[10px] text-gray-600 mt-5"><i class="fa-solid fa-lock mr-1"></i>Default: 100108</p>
+  </div>
+</div>
+
+<!-- ============ DASHBOARD ============ -->
+<div id="screen-dashboard" class="admin-screen hidden">
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-xl border border-amber-400/30 flex items-center justify-center bg-amber-400/5">
+        <i class="fa-solid fa-shield-halved text-amber-400"></i>
+      </div>
+      <div><h1 class="text-xl font-bold leading-tight">Admin Panel</h1><p class="text-xs text-gray-500">NoTrace Control Center</p></div>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <button class="btn btn-secondary btn-sm" onclick="refreshStats()"><i class="fa-solid fa-rotate"></i></button>
+      <button class="btn btn-secondary btn-sm" onclick="showScreen('cloudinary');loadCloudinary()"><i class="fa-solid fa-cloud text-blue-400"></i> Media</button>
+      <button class="btn btn-secondary btn-sm" onclick="showScreen('settings')"><i class="fa-solid fa-gear"></i> Settings</button>
+      <button class="btn btn-danger btn-sm" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i></button>
+    </div>
+  </div>
+  <div class="grid grid-cols-3 gap-3 mb-6">
+    <div class="stat-card"><div class="stat-value" id="stat-accounts">-</div><div class="stat-label">Accounts</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-messages">-</div><div class="stat-label">Messages</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-nodes">-</div><div class="stat-label">Nodes</div></div>
+  </div>
+  <h2 class="text-xs font-bold text-gray-400 mb-3 tracking-wider"><i class="fa-solid fa-server text-emerald-400 mr-1"></i> AUTH NODES</h2>
+  <div id="auth-cards" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6"></div>
+  <h2 class="text-xs font-bold text-gray-400 mb-3 tracking-wider"><i class="fa-solid fa-network-wired text-blue-400 mr-1"></i> SYNC NODES</h2>
+  <div id="sync-cards" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4"></div>
+  <div class="text-center text-[10px] text-gray-600 mt-6">Last updated: <span id="last-updated">-</span></div>
+</div>
+
+<!-- ============ DETAIL ============ -->
+<div id="screen-detail" class="admin-screen hidden">
+  <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
+    <div class="flex items-center gap-3">
+      <button class="btn btn-secondary btn-sm" onclick="showScreen('dashboard')"><i class="fa-solid fa-arrow-left"></i></button>
+      <div><h1 id="detail-title" class="text-lg font-bold">Node</h1><p id="detail-subtitle" class="text-xs text-gray-500">0 items</p></div>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="backupCurrent()"><i class="fa-solid fa-download"></i> Backup</button>
+  </div>
+  <div class="card p-3 mb-3 flex items-center gap-2">
+    <i class="fa-solid fa-magnifying-glass text-gray-500 text-sm ml-1"></i>
+    <input type="text" id="detail-search" class="flex-1 bg-transparent border-none outline-none text-sm px-1" placeholder="Cari nama / isi / ID..." oninput="renderDetailList()">
+    <span id="detail-count" class="text-[10px] text-gray-500 px-2 py-1 bg-[#1c1c21] rounded-full whitespace-nowrap">0</span>
+  </div>
+  <div id="filter-row" class="hidden flex gap-1 mb-3 flex-wrap">
+    <button class="btn btn-secondary btn-sm filter-btn active" data-filter="all" onclick="setTypeFilter('all')">All</button>
+    <button class="btn btn-secondary btn-sm filter-btn" data-filter="text" onclick="setTypeFilter('text')">💬 Text</button>
+    <button class="btn btn-secondary btn-sm filter-btn" data-filter="image" onclick="setTypeFilter('image')">🖼️ Image</button>
+    <button class="btn btn-secondary btn-sm filter-btn" data-filter="video" onclick="setTypeFilter('video')">🎥 Video</button>
+    <button class="btn btn-secondary btn-sm filter-btn" data-filter="audio" onclick="setTypeFilter('audio')">🎤 VN</button>
+    <button class="btn btn-secondary btn-sm filter-btn" data-filter="location" onclick="setTypeFilter('location')">📍 Loc</button>
+  </div>
+  <div id="detail-list" class="space-y-2 mb-6"></div>
+  <div class="card p-4 border-rose-500/30 bg-rose-500/5">
+    <div class="flex items-center gap-2 mb-3"><i class="fa-solid fa-triangle-exclamation text-rose-400"></i><h3 class="text-sm font-bold text-rose-400">DANGER ZONE</h3></div>
+    <p class="text-xs text-gray-400 mb-3">Hapus SEMUA item di node ini. Tidak bisa dibatalkan.</p>
+    <button class="btn btn-danger btn-sm" onclick="openDeleteAllModal()"><i class="fa-solid fa-trash-can"></i> Delete All</button>
+  </div>
+</div>
+
+<!-- ============ CLOUDINARY ============ -->
+<div id="screen-cloudinary" class="admin-screen hidden">
+  <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
+    <div class="flex items-center gap-3">
+      <button class="btn btn-secondary btn-sm" onclick="showScreen('dashboard')"><i class="fa-solid fa-arrow-left"></i></button>
+      <div><h1 class="text-lg font-bold">Cloudinary Media</h1><p class="text-xs text-gray-500">Lihat & hapus media langsung</p></div>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="loadCloudinary()"><i class="fa-solid fa-rotate"></i></button>
+  </div>
+  <div class="card p-3 mb-3">
+    <label class="text-xs text-gray-500 block mb-1">Akun Cloudinary:</label>
+    <select id="cld-account-sel" class="input" onchange="loadCloudinary()">
+      <option value="0">bf9yh3de</option>
+      <option value="1">hzpsjwhq</option>
+      <option value="2">lx0lc2nz</option>
+    </select>
+  </div>
+  <div class="flex gap-2 mb-4 flex-wrap items-center">
+    <button class="btn btn-secondary btn-sm cld-tab active" data-cldtab="image" onclick="setCldTab('image')">🖼️ Image</button>
+    <button class="btn btn-secondary btn-sm cld-tab" data-cldtab="video" onclick="setCldTab('video')">🎥 Video</button>
+    <button class="btn btn-secondary btn-sm cld-tab" data-cldtab="raw" onclick="setCldTab('raw')">📎 Raw</button>
+    <span id="cld-count" class="text-[10px] text-gray-500 px-2 py-1 bg-[#1c1c21] rounded-full ml-auto">-</span>
+  </div>
+  <div id="cld-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mb-6"></div>
+</div>
+
+<!-- ============ SETTINGS ============ -->
+<div id="screen-settings" class="admin-screen hidden">
+  <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
+    <div class="flex items-center gap-3">
+      <button class="btn btn-secondary btn-sm" onclick="showScreen('dashboard')"><i class="fa-solid fa-arrow-left"></i></button>
+      <div><h1 class="text-lg font-bold">Settings</h1><p class="text-xs text-gray-500">Password, API & Node</p></div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="saveNodeSettings()" id="btn-save-settings"><i class="fa-solid fa-save"></i> Save Nodes</button>
+  </div>
+
+  <h2 class="text-xs font-bold text-gray-400 mb-3 tracking-wider">🔐 ADMIN PASSWORD</h2>
+  <div class="card p-4 mb-6 space-y-2">
+    <p class="text-xs text-gray-500">Tersimpan lokal di browser. Lupa? DevTools → Local Storage → hapus <code class="text-amber-400">notrace_admin_pw</code>.</p>
+    <input type="password" id="pw-old" class="input" placeholder="Password lama">
+    <input type="password" id="pw-new" class="input" placeholder="Password baru (min 4)">
+    <input type="password" id="pw-confirm" class="input" placeholder="Konfirmasi">
+    <div class="flex gap-2">
+      <button class="btn btn-primary flex-1 py-2 text-xs" onclick="changeAdminPassword()"><i class="fa-solid fa-key"></i> Ganti</button>
+      <button class="btn btn-warn flex-1 py-2 text-xs" onclick="resetAdminPassword()"><i class="fa-solid fa-rotate-left"></i> Reset Default</button>
+    </div>
+  </div>
+
+  <h2 class="text-xs font-bold text-gray-400 mb-3 tracking-wider">🔑 RESET PASSWORD USER</h2>
+  <div class="card p-4 mb-6 space-y-2">
+    <p class="text-xs text-gray-500">Bantu user yang lupa password. Cari akun, lalu set password baru langsung.</p>
+    <input type="text" id="reset-acc-id" class="input uppercase" placeholder="Account ID (1000-XXXX)">
+    <input type="password" id="reset-new-pw" class="input" placeholder="Password baru (min 6)">
+    <button class="btn btn-warn w-full py-2 text-xs" onclick="adminResetUserPassword()"><i class="fa-solid fa-key"></i> Reset Password User</button>
+  </div>
+
+  <h2 class="text-xs font-bold text-gray-400 mb-3 tracking-wider">🖥️ AUTH NODES</h2>
+  <div id="settings-auth" class="space-y-2 mb-6"></div>
+  <h2 class="text-xs font-bold text-gray-400 mb-3 tracking-wider">🌐 SYNC NODES</h2>
+  <div id="settings-sync" class="space-y-2 mb-6"></div>
+  <h2 class="text-xs font-bold text-gray-400 mb-3 tracking-wider">⭐ PRIMARY CHAT NODE</h2>
+  <div class="card p-3 mb-4"><div id="settings-primary" class="space-y-1"></div></div>
+</div>
+</div>
+
+<a href="https://wa.me/6283867217963" target="_blank" class="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center shadow-2xl z-40"><i class="fa-brands fa-whatsapp text-xl"></i></a>
+
+<!-- ============ MEDIA VIEWER ============ -->
+<div id="modal-media" class="hidden fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
+  <button class="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white text-xl" onclick="closeMediaModal()"><i class="fa-solid fa-xmark"></i></button>
+  <div id="media-content" class="max-w-4xl max-h-[90vh] w-full flex items-center justify-center"></div>
+</div>
+
+<!-- ============ CONFIRM ============ -->
+<div id="modal-confirm" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+  <div class="card max-w-sm w-full p-6">
+    <div class="flex items-center gap-2 mb-3"><i class="fa-solid fa-circle-question text-amber-400 text-xl"></i><h3 class="text-base font-bold">Konfirmasi</h3></div>
+    <p id="confirm-msg" class="text-xs text-gray-400 mb-5">Yakin?</p>
+    <div class="flex gap-2">
+      <button class="btn btn-secondary flex-1 py-3" onclick="closeConfirm()">Batal</button>
+      <button id="confirm-yes-btn" class="btn btn-danger flex-1 py-3">Ya</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DELETE ALL ============ -->
+<div id="modal-delete-all" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+  <div class="card max-w-md w-full p-6">
+    <div class="flex items-center gap-2 mb-3"><i class="fa-solid fa-triangle-exclamation text-rose-400 text-xl"></i><h3 class="text-lg font-bold text-rose-400">DELETE ALL</h3></div>
+    <p class="text-xs text-gray-400 mb-4">Ketik <b class="text-white">HAPUS SEMUA</b> + password admin untuk konfirmasi.</p>
+    <div class="bg-[#1c1c21] rounded-xl p-3 mb-3 space-y-2">
+      <div class="flex justify-between text-xs"><span class="text-gray-500">Node:</span><span id="modal-node-name" class="text-white font-mono">-</span></div>
+      <div class="flex justify-between text-xs"><span class="text-gray-500">Items:</span><span id="modal-item-count" class="text-amber-400 font-bold">0</span></div>
+    </div>
+    <input type="text" id="modal-confirm-text" class="input mb-2" placeholder="HAPUS SEMUA">
+    <input type="password" id="modal-confirm-pw" class="input mb-4" placeholder="Password admin">
+    <div class="flex gap-2">
+      <button class="btn btn-secondary flex-1 py-3" onclick="closeDeleteAllModal()">Cancel</button>
+      <button id="modal-delete-btn" class="btn btn-danger flex-1 py-3" disabled onclick="confirmDeleteAll()">DELETE ALL</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================
+// CONFIG
+// =====================================================
+const ADMIN_PW_DEFAULT = "100108";
+const LEGACY_APP_KEY = "N0Tr4c3_M4st3r_K3y_2026!V2";
+const ROOM_GLOBAL_KEY = CryptoJS.SHA256(LEGACY_APP_KEY + "::room_global_v1").toString();
+const DECRYPT_FAILED = "__DECRYPT_FAILED__";
+
+const CLOUDINARY_ACCOUNTS = [
+  { cloudName: "bf9yh3de", apiKey: "566161185391664", apiSecret: "_2m6dxNY9OkX18p3MKM7QY0yBnQ" },
+  { cloudName: "hzpsjwhq", apiKey: "216766648987879", apiSecret: "ARasbW23aJ36wp0pckAmLkAzDwA" },
+  { cloudName: "lx0lc2nz", apiKey: "517345798643112", apiSecret: "X1ujLhyykhgs2AIseU5YO8gOoVE" }
+];
+
+const NODES = {
+  auth: [
+    { name: "Auth Node-1", project: "notrace-client",  url: "https://notrace-client-default-rtdb.asia-southeast1.firebasedatabase.app",  app: "adminAuth1", path: "notrace_accounts", type: "auth" },
+    { name: "Auth Node-2", project: "notrace-client2", url: "https://notrace-client2-default-rtdb.asia-southeast1.firebasedatabase.app", app: "adminAuth2", path: "notrace_accounts", type: "auth" }
+  ],
+  sync: [
+    { name: "Sync Node-1", project: "notrace-chat",  url: "https://notrace-chat-default-rtdb.asia-southeast1.firebasedatabase.app/",  app: "adminSync1", path: "notrace_messages", type: "sync" },
+    { name: "Sync Node-2", project: "notrace-chat2", url: "https://notrace-chat2-default-rtdb.asia-southeast1.firebasedatabase.app/", app: "adminSync2", path: "notrace_messages", type: "sync" },
+    { name: "Sync Node-3", project: "notrace-chat3", url: "https://notrace-chat3-default-rtdb.asia-southeast1.firebasedatabase.app/", app: "adminSync3", path: "notrace_messages", type: "sync" }
+  ],
+  config: { name: "Config", project: "notrace-config", url: "https://notrace-config-default-rtdb.asia-southeast1.firebasedatabase.app/", app: "adminConfig", path: "node_settings" }
+};
+
+const fb = {};
+[...NODES.auth, ...NODES.sync, NODES.config].forEach(n => {
+  try { const a = firebase.initializeApp({ projectId: n.project, databaseURL: n.url }, n.app); fb[n.app] = { app: a, db: a.database(), cfg: n }; }
+  catch (e) { console.error("Firebase init fail: " + n.app, e); }
+});
+
+// =====================================================
+// STATE
+// =====================================================
+let currentView = null, currentItems = [], nodeSettings = null, typeFilter = "all";
+let cldTab = "image", cldItems = [];
+
+// =====================================================
+// UTILS
+// =====================================================
+function escapeHtml(s) { if (!s) return ""; return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;"); }
+function formatDate(ts) { if (!ts) return "-"; try { return new Date(ts).toLocaleString("id-ID",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}); } catch(e) { return "-"; } }
+function truncate(s,n) { if (!s) return ""; s = String(s); return s.length > n ? s.slice(0,n) + "…" : s; }
+function showToast(msg, type = "info") {
+  const t = document.getElementById("toast");
+  const icon = type === "success" ? "fa-circle-check" : type === "error" ? "fa-circle-exclamation" : "fa-circle-info";
+  t.className = "toast toast-" + type;
+  t.innerHTML = '<i class="fa-solid ' + icon + '"></i><span>' + escapeHtml(msg) + '</span>';
+  t.classList.add("show");
+  clearTimeout(window.__tt);
+  window.__tt = setTimeout(() => t.classList.remove("show"), 3000);
+}
+function copyText(txt) { navigator.clipboard ? navigator.clipboard.writeText(txt).then(()=>showToast("Copied!","success")).catch(()=>showToast("Gagal copy","error")) : showToast("Copy tidak didukung","error"); }
+
+// =====================================================
+// CRYPTO
+// =====================================================
+function getPrivateKeyForChat(chatId) { return CryptoJS.SHA256(String(chatId) + "::private_v1").toString(); }
+function decryptContent(cipher, chatId) {
+  if (!cipher) return "[empty]";
+  const keys = [];
+  if (chatId) keys.push(getPrivateKeyForChat(chatId));
+  keys.push(ROOM_GLOBAL_KEY);
+  keys.push(LEGACY_APP_KEY);
+  for (const k of keys) {
+    try { const d = CryptoJS.AES.decrypt(cipher, k).toString(CryptoJS.enc.Utf8); if (d) return d; } catch(e) {}
+  }
+  return DECRYPT_FAILED;
+}
+async function hashString(s) { const buf = new TextEncoder().encode(s); const h = await crypto.subtle.digest("SHA-256", buf); return Array.from(new Uint8Array(h)).map(x => x.toString(16).padStart(2,"0")).join(""); }
+
+// =====================================================
+// AUTH
+// =====================================================
+function getAdminPassword() { return localStorage.getItem("notrace_admin_pw") || ADMIN_PW_DEFAULT; }
+function setAdminPassword(p) { localStorage.setItem("notrace_admin_pw", p); }
+function tryLogin() {
+  const v = document.getElementById("admin-password").value;
+  if (v === getAdminPassword()) {
+    sessionStorage.setItem("admin_logged","1");
+    document.getElementById("login-error").classList.add("hidden");
+    document.getElementById("admin-password").value = "";
+    showScreen("dashboard");
+  } else { document.getElementById("login-error").classList.remove("hidden"); }
+}
+function logout() { openConfirm("Logout dari admin panel?", () => { sessionStorage.removeItem("admin_logged"); showScreen("login"); }); }
+function checkAuth() { if (sessionStorage.getItem("admin_logged") === "1") showScreen("dashboard"); else showScreen("login"); }
+
+// =====================================================
+// SCREENS
+// =====================================================
+function showScreen(name) {
+  document.querySelectorAll(".admin-screen").forEach(el => el.classList.add("hidden"));
+  const el = document.getElementById("screen-" + name);
+  if (el) el.classList.remove("hidden");
+  if (name === "dashboard") renderDashboard();
+  if (name === "settings") renderSettings();
+}
+
+// =====================================================
+// DASHBOARD
+// =====================================================
+async function countItems(node) {
+  try { const s = await fb[node.app].db.ref(node.path).once("value"); const v = s.val(); return v ? Object.keys(v).length : 0; }
+  catch (e) { return -1; }
+}
+function renderNodeCard(node, i, count) {
+  const err = count < 0;
+  return `<div class="card node-card p-4">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="status-dot ${err ? 'status-error' : 'status-online'}"></span>
+      <i class="fa-solid ${node.type === 'auth' ? 'fa-server text-emerald-400' : 'fa-network-wired text-blue-400'} text-sm"></i>
+      <span class="font-bold text-sm truncate">${escapeHtml(node.name)}</span>
+    </div>
+    <p class="text-[10px] text-gray-500 font-mono mb-2 truncate">${escapeHtml(node.project)}</p>
+    <p class="text-xs ${err ? 'text-rose-400' : 'text-amber-400'} font-bold mb-3">${err ? 'Error' : (count + ' ' + (node.type === 'auth' ? 'accounts' : 'messages'))}</p>
+    <button class="btn btn-secondary btn-sm w-full" onclick="openDetail('${node.type}',${i})">Manage <i class="fa-solid fa-chevron-right text-[9px]"></i></button>
+  </div>`;
+}
+async function renderDashboard() {
+  const aC = document.getElementById("auth-cards"), sC = document.getElementById("sync-cards");
+  aC.innerHTML = NODES.auth.map((n,i) => renderNodeCard(n,i,-2)).join("");
+  sC.innerHTML = NODES.sync.map((n,i) => renderNodeCard(n,i,-2)).join("");
+  let tA = 0, tM = 0, tN = 0;
+  for (let i = 0; i < NODES.auth.length; i++) {
+    const c = await countItems(NODES.auth[i]);
+    const el = aC.children[i];
+    if (el) {
+      const dot = el.querySelector(".status-dot"), pct = el.querySelector("p.text-xs");
+      if (c >= 0) { dot.className = "status-dot status-online"; pct.className = "text-xs text-amber-400 font-bold mb-3"; pct.textContent = c + " accounts"; tA += c; tN++; }
+      else { dot.className = "status-dot status-error"; pct.className = "text-xs text-rose-400 font-bold mb-3"; pct.textContent = "Error"; }
+    }
+  }
+  for (let i = 0; i < NODES.sync.length; i++) {
+    const c = await countItems(NODES.sync[i]);
+    const el = sC.children[i];
+    if (el) {
+      const dot = el.querySelector(".status-dot"), pct = el.querySelector("p.text-xs");
+      if (c >= 0) { dot.className = "status-dot status-online"; pct.className = "text-xs text-amber-400 font-bold mb-3"; pct.textContent = c + " messages"; tM += c; tN++; }
+      else { dot.className = "status-dot status-error"; pct.className = "text-xs text-rose-400 font-bold mb-3"; pct.textContent = "Error"; }
+    }
+  }
+  document.getElementById("stat-accounts").textContent = tA.toLocaleString("id-ID");
+  document.getElementById("stat-messages").textContent = tM.toLocaleString("id-ID");
+  document.getElementById("stat-nodes").textContent = tN + " / " + (NODES.auth.length + NODES.sync.length);
+  document.getElementById("last-updated").textContent = new Date().toLocaleTimeString("id-ID");
+}
+function refreshStats() { showToast("Refreshing..."); renderDashboard(); }
+
+// =====================================================
+// DETAIL
+// =====================================================
+function getNodeByView(v) { return v ? (v.type === "auth" ? NODES.auth[v.index] : NODES.sync[v.index]) : null; }
+async function openDetail(type, index) {
+  currentView = { type, index };
+  const node = getNodeByView(currentView);
+  document.getElementById("detail-title").textContent = node.name;
+  document.getElementById("detail-search").value = "";
+  document.getElementById("detail-list").innerHTML = '<div class="text-center text-gray-500 py-8 text-sm"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>';
+  document.getElementById("filter-row").classList.toggle("hidden", type !== "sync");
+  if (type === "sync") setTypeFilter("all");
+  showScreen("detail");
+  try {
+    const s = await fb[node.app].db.ref(node.path).once("value");
+    const v = s.val();
+    currentItems = [];
+    if (v) Object.keys(v).forEach(k => currentItems.push({ id: k, data: v[k] }));
+    if (type === "sync") currentItems.sort((a,b) => (b.data.timestamp || 0) - (a.data.timestamp || 0));
+    else currentItems.sort((a,b) => (b.data.createdAt || 0) - (a.data.createdAt || 0));
+    document.getElementById("detail-subtitle").textContent = node.name + " • " + currentItems.length + " items";
+    renderDetailList();
+  } catch (e) {
+    document.getElementById("detail-list").innerHTML = '<div class="text-center text-rose-400 py-8 text-sm"><i class="fa-solid fa-triangle-exclamation mr-2"></i>Gagal load: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+function setTypeFilter(f) {
+  typeFilter = f;
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.toggle("active", b.dataset.filter === f));
+  renderDetailList();
+}
+function renderDetailList() {
+  if (!currentView) return;
+  const node = getNodeByView(currentView);
+  const search = (document.getElementById("detail-search").value || "").toLowerCase();
+  const list = document.getElementById("detail-list");
+  let items = currentItems;
+  if (node.type === "sync" && typeFilter !== "all") items = items.filter(it => (it.data.type || "text") === typeFilter);
+  if (search) items = items.filter(it => {
+    const d = it.data;
+    if (node.type === "auth") return (d.accountId || "").toLowerCase().includes(search) || (d.displayName || "").toLowerCase().includes(search);
+    const c = decryptContent(d.content || "", null);
+    return (d.senderName || "").toLowerCase().includes(search) || (c !== DECRYPT_FAILED && c.toLowerCase().includes(search)) || (d.senderId || "").toLowerCase().includes(search);
+  });
+  document.getElementById("detail-count").textContent = items.length + " / " + currentItems.length;
+  if (items.length === 0) { list.innerHTML = '<div class="card p-8 text-center text-gray-500 text-sm"><i class="fa-solid fa-inbox text-2xl mb-2 block opacity-50"></i>Tidak ada item</div>'; return; }
+  list.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  items.slice(0, 200).forEach(it => {
+    const d = it.data;
+    const card = document.createElement("div");
+    card.className = "card p-3";
+    if (node.type === "auth") {
+      const initial = (d.displayName || "?").substring(0,1).toUpperCase();
+      const banned = !!d.banned;
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1.5">
+              <div class="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-[10px] font-bold text-black shrink-0 overflow-hidden">${d.avatar ? '<img src="'+escapeHtml(d.avatar)+'" class="w-full h-full object-cover"/>' : escapeHtml(initial)}</div>
+              <span class="font-bold text-sm truncate">${escapeHtml(d.displayName || "(no name)")}</span>
+              ${banned ? '<span class="text-[9px] bg-rose-500/20 text-rose-400 px-1.5 py-0.5 rounded font-bold">BANNED</span>' : ''}
+            </div>
+            <div class="text-[11px] text-gray-400 font-mono mb-1 flex items-center gap-2">
+              <span>${escapeHtml(d.accountId || it.id)}</span>
+              <button class="text-gray-600 hover:text-white" onclick="copyText('${escapeHtml(d.accountId || it.id)}')"><i class="fa-solid fa-copy text-[10px]"></i></button>
+            </div>
+            <div class="text-[10px] text-gray-600">Dibuat: ${formatDate(d.createdAt)}</div>
+            ${banned && d.bannedReason ? '<div class="text-[10px] text-rose-400 mt-1">Alasan: '+escapeHtml(d.bannedReason)+'</div>' : ''}
+          </div>
+          <div class="flex flex-col gap-1 shrink-0">
+            <button class="btn ${banned ? 'btn-primary' : 'btn-danger'} btn-sm" onclick="toggleBan('${it.id}', ${banned})" title="${banned ? 'Unban' : 'Ban'}"><i class="fa-solid ${banned ? 'fa-unlock' : 'fa-ban'}"></i></button>
+            <button class="btn btn-danger btn-sm" onclick="deleteSingle('auth',${currentView.index},'${it.id}')" title="Hapus"><i class="fa-solid fa-trash-can"></i></button>
+            <button class="btn btn-secondary btn-sm" onclick="deleteFromAllNodes('auth','${it.id}')" title="Hapus dari semua node"><i class="fa-solid fa-globe"></i></button>
+          </div>
+        </div>`;
+    } else {
+      const content = decryptContent(d.content || "", null);
+      let preview = "", typeIcon = "";
+      if (d.type === "image") {
+        typeIcon = '<i class="fa-solid fa-image text-blue-400 text-xs"></i>';
+        if (content !== DECRYPT_FAILED && /^https?:/i.test(content)) {
+          preview = `<img src="${escapeHtml(content)}" class="rounded-lg max-h-32 mt-1 cursor-pointer border border-[#27272a]" onclick="openMediaModal('image','${escapeHtml(content)}')" onerror="this.style.display='none'">`;
+        } else preview = '<span class="text-gray-500 italic text-xs">[Image - url invalid]</span>';
+      } else if (d.type === "video") {
+        typeIcon = '<i class="fa-solid fa-video text-purple-400 text-xs"></i>';
+        preview = `<button class="btn btn-secondary btn-sm mt-1" onclick="openMediaModal('video','${escapeHtml(content)}')"><i class="fa-solid fa-play"></i> Buka Video</button>`;
+      } else if (d.type === "audio") {
+        typeIcon = '<i class="fa-solid fa-microphone text-emerald-400 text-xs"></i>';
+        let audioUrl = content, duration = 0;
+        try { const p = JSON.parse(content); audioUrl = p.url || content; duration = p.duration || 0; } catch(e) {}
+        if (/^https?:/i.test(audioUrl)) {
+          preview = `<div class="flex items-center gap-2 mt-1">
+            <audio src="${escapeHtml(audioUrl)}" controls class="h-9 max-w-[240px]"></audio>
+            <button class="btn btn-secondary btn-sm" onclick="openMediaModal('audio','${escapeHtml(audioUrl)}')"><i class="fa-solid fa-up-right-and-down-left-from-center text-[10px]"></i></button>
+          </div>`;
+        } else preview = '<span class="text-gray-500 italic text-xs">[VN - url invalid]</span>';
+      } else if (d.type === "location") {
+        typeIcon = '<i class="fa-solid fa-location-dot text-rose-400 text-xs"></i>';
+        preview = `<a href="${escapeHtml(content)}" target="_blank" class="text-blue-400 underline text-xs">${escapeHtml(truncate(content, 60))}</a>`;
+      } else {
+        typeIcon = '<i class="fa-solid fa-message text-emerald-400 text-xs"></i>';
+        const txt = content === DECRYPT_FAILED ? "[gagal dekripsi]" : truncate(content, 200);
+        preview = `<div class="text-xs text-gray-300 break-words bg-[#18181b] rounded-lg p-2 mt-1">${escapeHtml(txt)}</div>`;
+      }
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1 flex-wrap">
+              ${typeIcon}
+              <span class="font-bold text-xs">${escapeHtml(d.senderName || "Unknown")}</span>
+              <span class="text-[10px] text-gray-500">${escapeHtml(formatDate(d.timestamp))}</span>
+            </div>
+            <div class="text-[10px] text-gray-600 font-mono mb-1">${escapeHtml(d.senderId || "")}</div>
+            ${preview}
+            <div class="text-[10px] text-gray-600 mt-1.5 font-mono">ID: ${escapeHtml(truncate(it.id, 24))}</div>
+          </div>
+          <div class="flex flex-col gap-1 shrink-0">
+            <button class="btn btn-danger btn-sm" onclick="deleteSingle('sync',${currentView.index},'${it.id}')"><i class="fa-solid fa-trash-can"></i></button>
+            <button class="btn btn-secondary btn-sm" onclick="deleteFromAllNodes('sync','${it.id}')" title="Hapus dari semua node"><i class="fa-solid fa-globe"></i></button>
+          </div>
+        </div>`;
+    }
+    frag.appendChild(card);
+  });
+  list.appendChild(frag);
+  if (items.length > 200) {
+    const more = document.createElement("div");
+    more.className = "text-center text-gray-500 text-xs py-3";
+    more.textContent = "Menampilkan 200 dari " + items.length + " item. Pakai search untuk filter.";
+    list.appendChild(more);
+  }
+}
+
+// =====================================================
+// MEDIA MODAL
+// =====================================================
+function openMediaModal(type, src) {
+  const box = document.getElementById("media-content");
+  if (type === "image") box.innerHTML = `<img src="${src}" class="max-h-[85vh] max-w-full rounded-xl">`;
+  else if (type === "video") box.innerHTML = `<video src="${src}" controls autoplay class="max-h-[85vh] w-full rounded-xl"></video>`;
+  else if (type === "audio") box.innerHTML = `<audio src="${src}" controls autoplay class="w-full max-w-md"></audio>`;
+  document.getElementById("modal-media").classList.remove("hidden");
+}
+function closeMediaModal() {
+  document.getElementById("modal-media").classList.add("hidden");
+  document.getElementById("media-content").innerHTML = "";
+}
+
+// =====================================================
+// DELETE
+// =====================================================
+async function deleteSingle(type, index, itemId) {
+  const node = type === "auth" ? NODES.auth[index] : NODES.sync[index];
+  openConfirm("Hapus item ini dari " + node.name + "?", async () => {
+    try {
+      await fb[node.app].db.ref(node.path).child(itemId).remove();
+      currentItems = currentItems.filter(it => it.id !== itemId);
+      renderDetailList();
+      document.getElementById("detail-subtitle").textContent = node.name + " • " + currentItems.length + " items";
+      showToast("Item dihapus", "success");
+    } catch (e) { showToast("Gagal hapus: " + e.message, "error"); }
+  });
+}
+async function deleteFromAllNodes(type, itemId) {
+  const nodes = type === "auth" ? NODES.auth : NODES.sync;
+  openConfirm("Hapus item dari SEMUA " + nodes.length + " " + type + " node?", async () => {
+    let deleted = 0;
+    for (const node of nodes) {
+      try {
+        const snap = await fb[node.app].db.ref(node.path).child(itemId).once("value");
+        if (snap.exists()) { await fb[node.app].db.ref(node.path).child(itemId).remove(); deleted++; }
+      } catch (e) {}
+    }
+    currentItems = currentItems.filter(it => it.id !== itemId);
+    renderDetailList();
+    showToast("Dihapus dari " + deleted + " node", "success");
+  });
+}
+
+// =====================================================
+// BAN / UNBAN
+// =====================================================
+async function toggleBan(accountId, currentlyBanned) {
+  let reason = null;
+  if (!currentlyBanned) {
+    reason = prompt("Alasan ban (opsional):", "Melanggar aturan");
+    if (reason === null) return;
+  } else {
+    if (!confirm("Unban akun ini?")) return;
+  }
+  const updates = { banned: !currentlyBanned, bannedAt: currentlyBanned ? null : Date.now(), bannedReason: currentlyBanned ? null : (reason || "") };
+  let updated = 0;
+  for (const node of NODES.auth) {
+    try {
+      const ref = fb[node.app].db.ref(node.path).child(accountId);
+      const snap = await ref.once("value");
+      if (snap.exists()) { await ref.update(updates); updated++; }
+    } catch (e) {}
+  }
+  if (updated > 0) {
+    const it = currentItems.find(x => x.id === accountId);
+    if (it) Object.assign(it.data, updates);
+    renderDetailList();
+    showToast(currentlyBanned ? "Akun di-unban" : "Akun di-ban", "success");
+  } else showToast("Akun tidak ditemukan di node manapun", "error");
+}
+
+// =====================================================
+// DELETE ALL MODAL
+// =====================================================
+function openDeleteAllModal() {
+  if (!currentView) return;
+  const node = getNodeByView(currentView);
+  document.getElementById("modal-node-name").textContent = node.name;
+  document.getElementById("modal-item-count").textContent = currentItems.length;
+  document.getElementById("modal-confirm-text").value = "";
+  document.getElementById("modal-confirm-pw").value = "";
+  updateDeleteAllState();
+  document.getElementById("modal-delete-all").classList.remove("hidden");
+}
+function closeDeleteAllModal() { document.getElementById("modal-delete-all").classList.add("hidden"); }
+function updateDeleteAllState() {
+  const text = document.getElementById("modal-confirm-text").value.trim();
+  const pw = document.getElementById("modal-confirm-pw").value;
+  const btn = document.getElementById("modal-delete-btn");
+  const ok = text === "HAPUS SEMUA" && pw === getAdminPassword();
+  btn.disabled = !ok;
+}
+document.getElementById("modal-confirm-text").addEventListener("input", updateDeleteAllState);
+document.getElementById("modal-confirm-pw").addEventListener("input", updateDeleteAllState);
+
+async function confirmDeleteAll() {
+  if (!currentView) return;
+  const text = document.getElementById("modal-confirm-text").value.trim();
+  const pw = document.getElementById("modal-confirm-pw").value;
+  if (text !== "HAPUS SEMUA" || pw !== getAdminPassword()) return;
+  const node = getNodeByView(currentView);
+  const btn = document.getElementById("modal-delete-btn");
+  btn.textContent = "DELETING..."; btn.disabled = true;
+  try {
+    await fb[node.app].db.ref(node.path).remove();
+    currentItems = [];
+    renderDetailList();
+    document.getElementById("detail-subtitle").textContent = node.name + " • 0 items";
+    closeDeleteAllModal();
+    showToast("Semua item dihapus", "success");
+  } catch (e) { showToast("Gagal: " + e.message, "error"); }
+  finally { btn.innerHTML = '<i class="fa-solid fa-trash-can"></i> DELETE ALL'; updateDeleteAllState(); }
+}
+
+// =====================================================
+// CONFIRM MODAL
+// =====================================================
+let confirmCallback = null;
+function openConfirm(msg, cb) {
+  confirmCallback = cb;
+  document.getElementById("confirm-msg").textContent = msg;
+  document.getElementById("modal-confirm").classList.remove("hidden");
+  document.getElementById("confirm-yes-btn").onclick = () => { const fn = confirmCallback; closeConfirm(); if (fn) fn(); };
+}
+function closeConfirm() { confirmCallback = null; document.getElementById("modal-confirm").classList.add("hidden"); }
+
+// =====================================================
+// BACKUP
+// =====================================================
+function backupCurrent() {
+  if (!currentView) return;
+  const node = getNodeByView(currentView);
+  if (currentItems.length === 0) { showToast("Tidak ada data", "error"); return; }
+  const data = {};
+  currentItems.forEach(it => { data[it.id] = it.data; });
+  const json = JSON.stringify({ node: node.name, project: node.project, path: node.path, exportedAt: Date.now(), count: currentItems.length, data }, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = node.project + "_backup_" + new Date().toISOString().slice(0,10) + ".json";
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast("Backup diunduh", "success");
+}
+
+// =====================================================
+// ADMIN PASSWORD
+// =====================================================
+function changeAdminPassword() {
+  const oldPw = document.getElementById("pw-old").value;
+  const newPw = document.getElementById("pw-new").value;
+  const cfm = document.getElementById("pw-confirm").value;
+  if (oldPw !== getAdminPassword()) return showToast("Password lama salah", "error");
+  if (newPw.length < 4) return showToast("Password min 4 karakter", "error");
+  if (newPw !== cfm) return showToast("Konfirmasi tidak cocok", "error");
+  setAdminPassword(newPw);
+  document.getElementById("pw-old").value = "";
+  document.getElementById("pw-new").value = "";
+  document.getElementById("pw-confirm").value = "";
+  showToast("Password admin diganti", "success");
+}
+function resetAdminPassword() {
+  openConfirm("Reset password ke default (100108)?", () => {
+    localStorage.removeItem("notrace_admin_pw");
+    sessionStorage.removeItem("admin_logged");
+    showToast("Password direset ke default", "success");
+    showScreen("login");
+  });
+}
+
+// =====================================================
+// RESET USER PASSWORD
+// =====================================================
+async function adminResetUserPassword() {
+  const accId = document.getElementById("reset-acc-id").value.trim().toUpperCase();
+  const newPw = document.getElementById("reset-new-pw").value;
+  if (!accId) return showToast("Isi Account ID", "error");
+  if (newPw.length < 6) return showToast("Password min 6 karakter", "error");
+  openConfirm("Reset password user " + accId + "?", async () => {
+    let updated = 0;
+    const newHash = await hashString(accId + "::" + newPw);
+    for (const node of NODES.auth) {
+      try {
+        const ref = fb[node.app].db.ref(node.path).child(accId);
+        const snap = await ref.once("value");
+        if (snap.exists()) { await ref.update({ passwordHash: newHash }); updated++; }
+      } catch (e) {}
+    }
+    if (updated > 0) {
+      showToast("Password " + accId + " direset (di " + updated + " node)", "success");
+      document.getElementById("reset-acc-id").value = "";
+      document.getElementById("reset-new-pw").value = "";
+    } else showToast("User tidak ditemukan", "error");
+  });
+}
+
+// =====================================================
+// CLOUDINARY (FIXED — cldAuthHeader ditambahkan balik)
+// =====================================================
+function cldAuthHeader(acc) { return "Basic " + btoa(acc.apiKey + ":" + acc.apiSecret); }
+
+async function cldFetch(url, opts = {}, acc) {
+  const res = await fetch(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: cldAuthHeader(acc) } });
+  if (!res.ok) {
+    let msg = "HTTP " + res.status;
+    try { const e = await res.json(); msg = e.error?.message || msg; } catch(_) {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+async function cldList(acc, type, cursor) {
+  let url = `https://api.cloudinary.com/v1_1/${acc.cloudName}/resources/${type}?max_results=100`;
+  if (cursor) url += `&next_cursor=${cursor}`;
+  return cldFetch(url, {}, acc);
+}
+async function cldDelete(acc, type, publicIds) {
+  const ids = Array.isArray(publicIds) ? publicIds.join(",") : publicIds;
+  const url = `https://api.cloudinary.com/v1_1/${acc.cloudName}/resources/${type}/upload?public_ids=${encodeURIComponent(ids)}`;
+  return cldFetch(url, { method: "DELETE" }, acc);
+}
+function setCldTab(t) {
+  cldTab = t;
+  document.querySelectorAll(".cld-tab").forEach(b => b.classList.toggle("active", b.dataset.cldtab === t));
+  loadCloudinary();
+}
+async function loadCloudinary() {
+  const grid = document.getElementById("cld-grid");
+  const accIdx = parseInt(document.getElementById("cld-account-sel").value);
+  const acc = CLOUDINARY_ACCOUNTS[accIdx];
+  grid.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8 text-sm"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>';
+  try {
+    const data = await cldList(acc, cldTab);
+    cldItems = data.resources || [];
+    document.getElementById("cld-count").textContent = cldItems.length + " item";
+    renderCldGrid();
+  } catch (e) {
+    grid.innerHTML = `<div class="col-span-full text-center text-rose-400 py-8 text-sm">
+      <i class="fa-solid fa-triangle-exclamation mr-2"></i>${escapeHtml(e.message)}
+      <div class="text-gray-500 mt-2 text-xs">Cek API key/secret akun ${escapeHtml(acc.cloudName)}.</div>
+    </div>`;
+  }
+}
+function renderCldGrid() {
+  const grid = document.getElementById("cld-grid");
+  if (!cldItems.length) { grid.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8 text-sm">Kosong</div>'; return; }
+  grid.innerHTML = cldItems.map(r => {
+    const url = r.secure_url || r.url;
+    const id = r.public_id;
+    let preview = "";
+    if (cldTab === "image") {
+      const thumb = (r.secure_url || "").replace("/upload/", "/upload/w_300,h_300,c_fill/");
+      preview = `<img src="${escapeHtml(thumb)}" class="w-full h-32 object-cover rounded-t-xl" onerror="this.src='${escapeHtml(url)}'">`;
+    } else if (cldTab === "video") {
+      preview = `<video src="${escapeHtml(url)}" class="w-full h-32 object-cover rounded-t-xl" muted preload="metadata"></video>`;
+    } else {
+      preview = `<div class="w-full h-32 flex items-center justify-center bg-[#1c1c21] rounded-t-xl"><i class="fa-solid fa-file text-3xl text-gray-500"></i></div>`;
+    }
+    return `<div class="card overflow-hidden">
+      ${preview}
+      <div class="p-2">
+        <div class="text-[10px] text-gray-400 font-mono truncate mb-1" title="${escapeHtml(id)}">${escapeHtml(id)}</div>
+        <div class="text-[10px] text-gray-600 mb-2">${(r.bytes/1024).toFixed(1)} KB</div>
+        <div class="flex gap-1">
+          <a href="${escapeHtml(url)}" target="_blank" class="btn btn-secondary btn-sm flex-1"><i class="fa-solid fa-eye"></i></a>
+          <button class="btn btn-danger btn-sm flex-1" onclick="cldDeleteOne('${escapeHtml(id)}')"><i class="fa-solid fa-trash-can"></i></button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+async function cldDeleteOne(publicId) {
+  const accIdx = parseInt(document.getElementById("cld-account-sel").value);
+  const acc = CLOUDINARY_ACCOUNTS[accIdx];
+  openConfirm(`Hapus "${publicId}" dari ${acc.cloudName}?`, async () => {
+    try {
+      await cldDelete(acc, cldTab, publicId);
+      cldItems = cldItems.filter(r => r.public_id !== publicId);
+      renderCldGrid();
+      document.getElementById("cld-count").textContent = cldItems.length + " item";
+      showToast("Media dihapus", "success");
+    } catch (e) { showToast("Gagal hapus: " + e.message, "error"); }
+  });
+}
+
+// =====================================================
+// NODE SETTINGS
+// =====================================================
+async function loadNodeSettings() {
+  if (nodeSettings) return nodeSettings;
+  try { const s = await fb[NODES.config.app].db.ref(NODES.config.path).once("value"); nodeSettings = s.val() || {}; }
+  catch (e) { nodeSettings = {}; }
+  const aOld = Array.isArray(nodeSettings.authNodesActive) ? nodeSettings.authNodesActive : [];
+  nodeSettings.authNodesActive = Array.from({length: 10}, (_, i) => i < aOld.length ? aOld[i] === true : i < 2);
+  const sOld = Array.isArray(nodeSettings.syncNodesActive) ? nodeSettings.syncNodesActive : [];
+  nodeSettings.syncNodesActive = Array.from({length: 100}, (_, i) => i < sOld.length ? sOld[i] === true : i < 3);
+  if (typeof nodeSettings.activeChatNode !== "number") nodeSettings.activeChatNode = 0;
+  if (typeof nodeSettings.activeAuthNode !== "number") nodeSettings.activeAuthNode = 0;
+  return nodeSettings;
+}
+async function renderSettings() {
+  await loadNodeSettings();
+  const authList = document.getElementById("settings-auth");
+  const syncList = document.getElementById("settings-sync");
+  const primaryList = document.getElementById("settings-primary");
+  authList.innerHTML = ""; syncList.innerHTML = ""; primaryList.innerHTML = "";
+  NODES.auth.forEach((node, i) => {
+    const isOn = nodeSettings.authNodesActive[i] === true;
+    const div = document.createElement("div");
+    div.className = "card p-3 flex items-center justify-between gap-3";
+    div.innerHTML = `<div class="flex items-center gap-3 min-w-0">
+      <i class="fa-solid fa-server ${isOn ? 'text-emerald-400' : 'text-gray-600'}"></i>
+      <div class="min-w-0"><div class="text-sm font-bold truncate">${escapeHtml(node.name)}</div><div class="text-[10px] text-gray-500 font-mono truncate">${escapeHtml(node.project)}</div></div>
+    </div>
+    <div class="toggle ${isOn ? 'on' : ''}" onclick="toggleAuthNode(${i})"></div>`;
+    authList.appendChild(div);
+  });
+  NODES.sync.forEach((node, i) => {
+    const isOn = nodeSettings.syncNodesActive[i] === true;
+    const isPrimary = nodeSettings.activeChatNode === i;
+    const div = document.createElement("div");
+    div.className = "card p-3 flex items-center justify-between gap-3";
+    div.innerHTML = `<div class="flex items-center gap-3 min-w-0">
+      <i class="fa-solid fa-network-wired ${isOn ? 'text-blue-400' : 'text-gray-600'}"></i>
+      <div class="min-w-0"><div class="text-sm font-bold truncate">${escapeHtml(node.name)} ${isPrimary ? '<span class="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded ml-1">PRIMARY</span>' : ''}</div><div class="text-[10px] text-gray-500 font-mono truncate">${escapeHtml(node.project)}</div></div>
+    </div>
+    <div class="toggle ${isOn ? 'on' : ''}" onclick="toggleSyncNode(${i})"></div>`;
+    syncList.appendChild(div);
+  });
+  NODES.sync.forEach((node, i) => {
+    const isPrimary = nodeSettings.activeChatNode === i;
+    const div = document.createElement("label");
+    div.className = "flex items-center gap-3 p-2.5 rounded-lg cursor-pointer hover:bg-[#1c1c21] " + (isPrimary ? "bg-emerald-500/5 border border-emerald-500/20" : "");
+    div.innerHTML = `<input type="radio" name="primary" ${isPrimary ? 'checked' : ''} onchange="setPrimary(${i})" class="accent-emerald-500">
+      <span class="text-xs flex-1">${escapeHtml(node.name)} <span class="text-gray-500">(${escapeHtml(node.project)})</span></span>`;
+    primaryList.appendChild(div);
+  });
+}
+function toggleAuthNode(i) { if (!nodeSettings) return; nodeSettings.authNodesActive[i] = !nodeSettings.authNodesActive[i]; renderSettings(); }
+function toggleSyncNode(i) { if (!nodeSettings) return; nodeSettings.syncNodesActive[i] = !nodeSettings.syncNodesActive[i]; renderSettings(); }
+function setPrimary(i) { if (!nodeSettings) return; nodeSettings.activeChatNode = i; renderSettings(); }
+async function saveNodeSettings() {
+  if (!nodeSettings) return;
+  const btn = document.getElementById("btn-save-settings");
+  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+  try {
+    nodeSettings.updatedAt = Date.now();
+    await fb[NODES.config.app].db.ref(NODES.config.path).set(nodeSettings);
+    showToast("Settings tersimpan", "success");
+  } catch (e) { showToast("Gagal save: " + e.message, "error"); }
+  finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save"></i> Save Nodes'; }
+}
+
+// =====================================================
+// INIT
+// =====================================================
+window.addEventListener("load", checkAuth);
+</script>
+</body>
+</html>
